@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ダーツで体験する正規分布（t分布も）</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#121a33; --panel2:#0f1730;
+      --text:#e9ecff; --muted:#aeb7e6; --accent:#74d3ff;
+      --line: rgba(255,255,255,0.12);
+      --good:#57f287; --warn:#fee75c; --bad:#ff5c5c;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", sans-serif;
+      background: radial-gradient(1200px 800px at 30% 10%, #1a2a5a 0%, var(--bg) 55%, #050816 100%);
+      color:var(--text);
+    }
+    header{
+      padding:12px 16px; border-bottom:1px solid var(--line);
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+      background: rgba(0,0,0,0.18);
+      position:sticky; top:0; backdrop-filter: blur(8px);
+      z-index:5;
+    }
+    header .title{font-weight:700}
+    header .hint{color:var(--muted); font-size:12px}
+    main{
+      display:grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap:12px;
+      padding:12px;
+      height: calc(100vh - 56px);
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border:1px solid var(--line);
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      min-height:0;
+    }
+    .card .card-h{
+      padding:10px 12px;
+      background: rgba(0,0,0,0.18);
+      border-bottom:1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between;
+      gap:10px;
+    }
+    .card .card-b{ padding:12px; min-height:0; height:100%;}
+    .split{
+      display:grid;
+      grid-template-rows: auto 1fr;
+      height:100%;
+      min-height:0;
+    }
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    label{font-size:12px; color:var(--muted)}
+    input[type="number"], select, input[type="range"]{
+      background: rgba(0,0,0,0.25);
+      border:1px solid var(--line);
+      color:var(--text);
+      border-radius:10px;
+      padding:8px 10px;
+      outline:none;
+    }
+    input[type="range"]{ padding:0; height:32px }
+    .field{display:grid; gap:6px; min-width:160px}
+    .btn{
+      background: linear-gradient(180deg, rgba(116,211,255,0.35), rgba(116,211,255,0.15));
+      border:1px solid rgba(116,211,255,0.5);
+      color:var(--text);
+      padding:9px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:700;
+      user-select:none;
+    }
+    .btn:active{ transform: translateY(1px) }
+    .btn.secondary{
+      background: rgba(255,255,255,0.06);
+      border:1px solid var(--line);
+      font-weight:600;
+    }
+    .statgrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .stat{
+      background: rgba(0,0,0,0.22);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+    }
+    .stat .k{font-size:12px; color:var(--muted)}
+    .stat .v{font-size:18px; font-weight:800; margin-top:4px}
+    .small{font-size:12px; color:var(--muted)}
+    .pill{
+      font-size:12px; padding:6px 10px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      color:var(--muted);
+      background: rgba(0,0,0,0.2);
+      white-space:nowrap;
+    }
+    canvas{display:block; width:100%; height:100%}
+    .twoCanv{
+      display:grid;
+      grid-template-rows: 1fr auto;
+      height:100%;
+      min-height:0;
+      gap:10px;
+    }
+    .histWrap{
+      height:210px;
+      border:1px solid var(--line);
+      border-radius:14px;
+      overflow:hidden;
+      background: rgba(0,0,0,0.18);
+    }
+    .log{
+      height:160px;
+      overflow:auto;
+      background: rgba(0,0,0,0.18);
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Noto Sans Mono", monospace;
+      font-size:12px;
+      color: #d7dcff;
+    }
+    .kv{display:flex; gap:10px; align-items:baseline; justify-content:space-between}
+    .kv b{color:var(--text)}
+    .warnTxt{color: var(--warn)}
+    .okTxt{color: var(--good)}
+    .badTxt{color: var(--bad)}
+
+    #distFormula{
+  white-space: pre-wrap;   /* 改行をそのまま表示 */
+  line-height: 1.35;
+}
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="title">🎯 ダーツで体験する確率分布</div>
+  </div>
+  <div class="pill" id="statusPill">クリックして投げよう</div>
+</header>
+
+<main>
+  <!-- Left: Game -->
+  <section class="card split">
+    <div class="card-h">
+      <div class="row">
+        <b>ゲーム画面</b>
+        <span class="pill">ターゲット：<span id="aimDisp">中心</span></span>
+        <span class="pill">着弾点：<span id="lastDisp">—</span></span>
+        <span class="pill">取得点数：<span id="lastScoreDisp">—</span></span>
+      </div>
+      <div class="row">
+        <button class="btn secondary" id="toggleAimBtn">ターゲットを固定：ON</button>
+        <button class="btn secondary" id="clearMarksBtn">着弾点を消す</button>
+      </div>
+    </div>
+    <div class="card-b">
+      <div class="twoCanv">
+        <div style="border:1px solid var(--line); border-radius:14px; overflow:hidden; background:rgba(0,0,0,0.18); min-height:0;">
+          <canvas id="board"></canvas>
+        </div>
+        <div class="histWrap">
+          <canvas id="hist"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Right: Controls / Stats -->
+  <section class="card split">
+    <div class="card-h">
+      <b>設定・分析</b>
+      <div class="row">
+       <button class="btn" id="resetAllBtn">リセット</button>
+       <button class="btn secondary" id="exportCsvBtn">ログ出力</button>
+      </div>
+    </div>
+    <div class="card-b" style="overflow:auto;">
+      <div class="row">
+        <div class="field">
+          <label>試行回数</label>
+          <input type="number" id="trialN" min="1" max="5000" step="1" value="200">
+        </div>
+        <div class="field">
+          <label>自動連投（クリック1回で試行回数分投げる．）</label>
+          <select id="autoMode">
+            <option value="off">OFF</option>
+            <option value="on">ON</option>
+          </select>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--line); margin:12px 0;">
+
+<!-- ノイズ分布：選択行 -->
+<div class="row">
+  <div class="field">
+    <label>ノイズ分布</label>
+    <select id="distType">
+      <option value="normal">正規分布 N(0, σ²)</option>
+      <option value="t">t分布（自由度ν）</option>
+      <option value="uniform">一様分布 U(-a, a)</option>
+      <option value="laplace">ラプラス分布（尖り）</option>
+      <option value="none">ノイズなし</option>
+    </select>
+  </div>
+</div>
+
+<!-- 分布の外形＆数式（rowの外に出す） -->
+<hr style="border:none;border-top:1px solid var(--line); margin:12px 0;">
+<div class="stat" style="margin-top:8px;">
+  <div class="k">選択中のノイズ分布（外形/特徴）</div>
+  <div class="v" id="distOutline" style="font-size:14px; font-weight:700;">—</div>
+  <div class="small" id="distParams">—</div>
+  <div class="small" style="margin-top:8px;">数式</div>
+  <div id="distFormula" class="log" style="height:auto; max-height:180px; overflow:auto;">—</div>
+</div>
+
+<!-- ノイズパラメータ：スライダ行（別row） -->
+<div class="row" style="margin-top:10px;">
+  <div class="field" id="sigmaField">
+    <label>標準偏差 σ（px）</label>
+    <input type="range" id="sigma" min="0" max="120" step="1" value="25">
+    <div class="small">σ = <span id="sigmaDisp">25</span> px</div>
+  </div>
+
+  <div class="field" id="nuField" style="display:none;">
+    <label>t分布 自由度 ν（小さいほど外れやすい）</label>
+    <input type="range" id="nu" min="1" max="60" step="1" value="5">
+    <div class="small">ν = <span id="nuDisp">5</span></div>
+  </div>
+
+  <div class="field" id="aField" style="display:none;">
+    <label>一様分布 振れ幅 a（px）</label>
+    <input type="range" id="a" min="0" max="160" step="1" value="40">
+    <div class="small">a = <span id="aDisp">40</span> px</div>
+  </div>
+
+  <div class="field" id="bField" style="display:none;">
+    <label>ラプラス スケール b（px）</label>
+    <input type="range" id="b" min="0" max="120" step="1" value="18">
+    <div class="small">b = <span id="bDisp">18</span> px</div>
+  </div>
+</div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>ヒストグラム：表示ビン数</label>
+          <input type="range" id="bins" min="5" max="40" step="1" value="15">
+          <div class="small">bins = <span id="binsDisp">15</span></div>
+        </div>
+        <div class="field">
+          <label>記録する値</label>
+          <select id="recordWhat">
+            <option value="score">得点</option>
+            <option value="radius">中心からの距離 r（px）</option>
+            <option value="dx">x誤差（px）</option>
+            <option value="dy">y誤差（px）</option>
+          </select>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--line); margin:12px 0;">
+
+      <div class="row">
+        <div class="pill">残り：<b id="remainDisp">50</b></div>
+        <div class="pill">総得点：<b id="sumScoreDisp">0</b></div>
+        <div class="pill">平均得点：<b id="meanScoreDisp">0</b></div>
+      </div>
+
+      <!-- ▼▼ 置換：統計＋計算式（右側）レイアウト ▼▼ -->
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:start; margin-top:10px;">
+  <div class="statgrid" style="margin:0;">
+    <div class="stat">
+      <div class="k">平均（記録値）</div>
+      <div class="v" id="meanDisp">—</div>
+      <div class="small" id="meanNote">—</div>
+    </div>
+    <div class="stat">
+      <div class="k">分散（記録値）</div>
+      <div class="v" id="varDisp">—</div>
+      <div class="small">母分散（nで割る）</div>
+    </div>
+    <div class="stat">
+      <div class="k">標準偏差（記録値）</div>
+      <div class="v" id="sdDisp">—</div>
+      <div class="small">√分散</div>
+    </div>
+    <div class="stat">
+      <div class="k">サンプル数 n</div>
+      <div class="v" id="nDisp">0</div>
+      <div class="small">投げた回数</div>
+    </div>
+  </div>
+
+  <!-- ▼追加：計算式カード（右側） -->
+  <div class="stat">
+    <div class="k">計算式（記録値 x₁..xₙ）</div>
+    <div class="log" style="height:auto;">
+      平均： μ = (1/n) Σ xᵢ<br>
+      分散（母分散）： σ² = (1/n) Σ (xᵢ − μ)²<br>
+      標準偏差： σ = √(σ²)
+      <hr style="border:none;border-top:1px solid var(--line); margin:10px 0;">
+      <span class="small">※「記録する値」が得点/半径/誤差(dx,dy)のどれでも同じ式です。</span>
+    </div>
+  </div>
+</div>
+<!-- ▲▲ 置換：統計＋計算式（右側）レイアウト ▲▲ -->
+
+      <hr style="border:none;border-top:1px solid var(--line); margin:12px 0;">
+
+      <div class="row" style="align-items:flex-start;">
+        <div style="flex:1; min-width:260px;">
+          <div class="kv"><span class="small">ログ（得点/誤差）</span><span class="small">最新が下</span></div>
+          <div class="log" id="log"></div>
+        </div>
+      </div>
+
+      <div class="small" style="margin-top:10px;">
+        <span class="okTxt">Tip</span>：分布を「t分布（ν小）」にすると外れ値が増え、標準偏差が大きくなりやすいです。<br>
+        <span class="warnTxt">Tip</span>：σを上げるほど中心から外れやすく、平均得点も下がります（一般に）。
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ====== Canvas setup ======
+  const board = document.getElementById('board');
+  const hist = document.getElementById('hist');
+  const bctx = board.getContext('2d');
+  const hctx = hist.getContext('2d');
+
+  function resizeCanvasToCSS(cnv){
+    const rect = cnv.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    cnv.width = Math.floor(rect.width * dpr);
+    cnv.height = Math.floor(rect.height * dpr);
+    const ctx = cnv.getContext('2d');
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    return {w: rect.width, h: rect.height, dpr};
+  }
+
+  let bw=0, bh=0, hw=0, hh=0;
+
+  // ====== Dartboard model ======
+  const rings = [
+    { r: 40, score: 10 },
+    { r: 80, score:  8 },
+    { r: 120, score: 6 },
+    { r: 160, score: 4 },
+    { r: 200, score: 2 },
+  ];
+  // outside: 0
+
+  let center = {x: 0, y: 0};
+  let aim = {x: 0, y: 0};   // relative to center
+  let marks = [];           // {x,y,score} relative to center
+  let allowAimUpdate = true;
+
+  // ====== UI elements ======
+  const statusPill = document.getElementById('statusPill');
+  const aimDisp = document.getElementById('aimDisp');
+  const lastDisp = document.getElementById('lastDisp');
+  const lastScoreDisp = document.getElementById('lastScoreDisp');
+
+  const trialN = document.getElementById('trialN');
+  const autoMode = document.getElementById('autoMode');
+  const distType = document.getElementById('distType');
+
+  const sigmaField = document.getElementById('sigmaField');
+  const nuField = document.getElementById('nuField');
+  const aField = document.getElementById('aField');
+  const bField = document.getElementById('bField');
+
+  const sigma = document.getElementById('sigma');
+  const nu = document.getElementById('nu');
+  const a = document.getElementById('a');
+  const b = document.getElementById('b');
+  const sigmaDisp = document.getElementById('sigmaDisp');
+  const nuDisp = document.getElementById('nuDisp');
+  const aDisp = document.getElementById('aDisp');
+  const bDisp = document.getElementById('bDisp');
+
+  const bins = document.getElementById('bins');
+  const binsDisp = document.getElementById('binsDisp');
+  const recordWhat = document.getElementById('recordWhat');
+
+  const remainDisp = document.getElementById('remainDisp');
+  const sumScoreDisp = document.getElementById('sumScoreDisp');
+  const meanScoreDisp = document.getElementById('meanScoreDisp');
+
+  const meanDisp = document.getElementById('meanDisp');
+  const varDisp  = document.getElementById('varDisp');
+  const sdDisp   = document.getElementById('sdDisp');
+  const nDisp    = document.getElementById('nDisp');
+  const meanNote = document.getElementById('meanNote');
+
+  const logEl = document.getElementById('log');
+  const distOutline = document.getElementById('distOutline');
+  const distParams  = document.getElementById('distParams');
+  const distFormula = document.getElementById('distFormula');
+  const exportCsvBtn = document.getElementById('exportCsvBtn');
+
+  const toggleAimBtn = document.getElementById('toggleAimBtn');
+  const clearMarksBtn = document.getElementById('clearMarksBtn');
+  const resetAllBtn = document.getElementById('resetAllBtn');
+
+  // ====== Data ======
+  let remain = parseInt(trialN.value, 10);
+  let scores = [];      // per throw
+  let record = [];      // histogram target values
+  let sumScore = 0;
+  let logRows = []; // CSV出力用：{idx, score, dx, dy, r, hitx, hity, dist, params, timestamp}
+
+  function setRemain(n){
+    remain = Math.max(0, n|0);
+    remainDisp.textContent = remain;
+    statusPill.textContent = (remain>0) ? "クリックして投げよう" : "終了（リセットで再開）";
+  }
+  setRemain(remain);
+
+  // ====== Random generators ======
+  function randU(){ // (0,1)
+    let u = Math.random();
+    if (u === 0) u = 1e-12;
+    return u;
+  }
+  // Box-Muller standard normal
+  function randN(){
+    const u1 = randU();
+    const u2 = randU();
+    return Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2);
+  }
+  // Student t via normal / sqrt(chi2/nu). Chi-square via gamma(k=nu/2, theta=2)
+  function randGamma(k, theta){
+    // Marsaglia and Tsang (k>0)
+    if (k < 1){
+      // Johnk's generator
+      const u = randU();
+      return randGamma(1+k, theta) * Math.pow(u, 1/k);
+    }
+    const d = k - 1/3;
+    const c = 1/Math.sqrt(9*d);
+    while(true){
+      let x = randN();
+      let v = 1 + c*x;
+      if (v <= 0) continue;
+      v = v*v*v;
+      const u = randU();
+      if (u < 1 - 0.0331*(x*x)*(x*x)) return d*v*theta;
+      if (Math.log(u) < 0.5*x*x + d*(1 - v + Math.log(v))) return d*v*theta;
+    }
+  }
+  function randChi2(nu){
+    return randGamma(nu/2, 2);
+  }
+  function randT(nu){
+    const z = randN();
+    const v = randChi2(nu);
+    return z / Math.sqrt(v/nu);
+  }
+  function randLaplace(b){
+    // inverse CDF
+    const u = Math.random() - 0.5;
+    return -b * Math.sign(u) * Math.log(1 - 2*Math.abs(u));
+  }
+
+  function sampleNoise(){
+    const type = distType.value;
+    if (type === "none") return {dx:0, dy:0};
+
+    if (type === "normal"){
+      const s = +sigma.value;
+      return {dx: s*randN(), dy: s*randN()};
+    }
+    if (type === "t"){
+      const s = +sigma.value;
+      const nuv = +nu.value;
+      return {dx: s*randT(nuv), dy: s*randT(nuv)};
+    }
+    if (type === "uniform"){
+      const aa = +a.value;
+      return {dx: (Math.random()*2-1)*aa, dy: (Math.random()*2-1)*aa};
+    }
+    if (type === "laplace"){
+      const bb = +b.value;
+      return {dx: randLaplace(bb), dy: randLaplace(bb)};
+    }
+    return {dx:0, dy:0};
+  }
+
+  // ====== Scoring ======
+function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
+
+// 盤半径（今は rings の最大半径）
+function boardRadius(){
+  return rings[rings.length-1].r;
+}
+
+// 連続得点：中心10点 → 外周0点（線形）
+function scoreFromRadius(r){
+  const R = boardRadius();
+  const s = 10 * (1 - r / R);
+  return clamp(s, 0, 10);   // 0〜10点（小数）
+}
+
+  function recordValue(score, r, dx, dy){
+    const what = recordWhat.value;
+    if (what === "score") return score;
+    if (what === "radius") return r;
+    if (what === "dx") return dx;
+    if (what === "dy") return dy;
+    return score;
+  }
+
+  // ====== Statistics ======
+  function mean(arr){
+    if (arr.length===0) return NaN;
+    let s=0;
+    for (const v of arr) s += v;
+    return s/arr.length;
+  }
+  function variancePopulation(arr){
+    if (arr.length===0) return NaN;
+    const m = mean(arr);
+    let s=0;
+    for (const v of arr){
+      const d=v-m;
+      s += d*d;
+    }
+    return s/arr.length; // 母分散
+  }
+  function stddevPopulation(arr){
+    const v = variancePopulation(arr);
+    return Math.sqrt(v);
+  }
+
+  function fmt(x, digits=3){
+    if (!Number.isFinite(x)) return "—";
+    const p = Math.pow(10,digits);
+    return (Math.round(x*p)/p).toString();
+  }
+
+  function updateStats(){
+    const n = record.length;
+    nDisp.textContent = n;
+
+    // score stats
+    sumScoreDisp.textContent = fmt(sumScore, 2);
+    meanScoreDisp.textContent = (scores.length ? fmt(mean(scores), 3) : "0");
+
+    const m = mean(record);
+    const v = variancePopulation(record);
+    const sd = stddevPopulation(record);
+
+    meanDisp.textContent = fmt(m, 4);
+    varDisp.textContent  = fmt(v, 4);
+    sdDisp.textContent   = fmt(sd, 4);
+
+    const what = recordWhat.value;
+    if (what==="score") meanNote.textContent = "得点の平均";
+    else if (what==="radius") meanNote.textContent = "中心距離 r の平均（px）";
+    else if (what==="dx") meanNote.textContent = "x誤差の平均（px）";
+    else if (what==="dy") meanNote.textContent = "y誤差の平均（px）";
+    else meanNote.textContent = "—";
+
+    drawHist();
+  }
+
+  function logLine(s){
+    const div = document.createElement('div');
+    div.textContent = s;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function fillTextMultiline(ctx, text, x, y, lineHeight){
+  const lines = String(text).split("\n");
+  for (let i = 0; i < lines.length; i++){
+    ctx.fillText(lines[i], x, y + i * lineHeight);
+  }
+}
+
+  // ====== Drawing: Board ======
+  function drawBoard(){
+    bctx.clearRect(0,0,bw,bh);
+
+    // background
+    bctx.fillStyle = "rgba(0,0,0,0.15)";
+    bctx.fillRect(0,0,bw,bh);
+
+    center = {x: bw/2, y: bh/2};
+    const R = rings[rings.length-1].r;
+
+    // subtle grid
+    bctx.save();
+    bctx.strokeStyle = "rgba(255,255,255,0.06)";
+    bctx.lineWidth = 1;
+    for(let x=0;x<bw;x+=40){
+      bctx.beginPath(); bctx.moveTo(x,0); bctx.lineTo(x,bh); bctx.stroke();
+    }
+    for(let y=0;y<bh;y+=40){
+      bctx.beginPath(); bctx.moveTo(0,y); bctx.lineTo(bw,y); bctx.stroke();
+    }
+    bctx.restore();
+
+    // rings
+    for (let i=rings.length-1;i>=0;i--){
+      const rr = rings[i].r;
+      bctx.beginPath();
+      bctx.arc(center.x, center.y, rr, 0, Math.PI*2);
+      bctx.fillStyle = (i%2===0) ? "rgba(116,211,255,0.10)" : "rgba(255,255,255,0.06)";
+      bctx.fill();
+      bctx.lineWidth = 2;
+      bctx.strokeStyle = "rgba(255,255,255,0.16)";
+      bctx.stroke();
+
+      // label score
+      bctx.fillStyle = "rgba(233,236,255,0.85)";
+      bctx.font = "12px system-ui";
+      bctx.textAlign = "left";
+      bctx.textBaseline = "middle";
+      bctx.fillText(`${rings[i].score}点`, center.x + rr + 8, center.y);
+    }
+
+    // bull
+    bctx.beginPath();
+    bctx.arc(center.x, center.y, 6, 0, Math.PI*2);
+    bctx.fillStyle = "rgba(87,242,135,0.9)";
+    bctx.fill();
+
+    // aim marker
+    bctx.save();
+    bctx.translate(center.x, center.y);
+    bctx.strokeStyle = "rgba(254,231,92,0.9)";
+    bctx.lineWidth = 2;
+    bctx.beginPath();
+    bctx.arc(aim.x, aim.y, 9, 0, Math.PI*2);
+    bctx.stroke();
+    bctx.beginPath();
+    bctx.moveTo(aim.x-14, aim.y); bctx.lineTo(aim.x+14, aim.y);
+    bctx.moveTo(aim.x, aim.y-14); bctx.lineTo(aim.x, aim.y+14);
+    bctx.stroke();
+    bctx.restore();
+
+    // marks
+    bctx.save();
+    bctx.translate(center.x, center.y);
+    for (const m of marks){
+      bctx.beginPath();
+      bctx.arc(m.x, m.y, 6, 0, Math.PI*2);
+      bctx.fillStyle = "rgba(255,92,92,0.9)";
+      bctx.fill();
+      bctx.strokeStyle = "rgba(0,0,0,0.5)";
+      bctx.lineWidth = 2;
+      bctx.stroke();
+    }
+    bctx.restore();
+
+    // axes label
+    bctx.fillStyle = "rgba(233,236,255,0.55)";
+    bctx.font = "24px system-ui";
+    bctx.textAlign = "left";
+    bctx.textBaseline = "top";
+
+    const text = "🟡ターゲット\n🔴着弾点";
+    fillTextMultiline(bctx, text, 12, 12, 30);
+
+  }
+
+  // ====== Drawing: Histogram ======
+  function drawHist(){
+    hctx.clearRect(0,0,hw,hh);
+
+    // background
+    hctx.fillStyle = "rgba(0,0,0,0.15)";
+    hctx.fillRect(0,0,hw,hh);
+
+    const n = record.length;
+    if (n === 0){
+      hctx.fillStyle = "rgba(233,236,255,0.7)";
+      hctx.font = "14px system-ui";
+      hctx.textAlign = "center";
+      hctx.textBaseline = "middle";
+      hctx.fillText("ヒストグラム（まだデータなし）", hw/2, hh/2);
+      return;
+    }
+
+    const binCount = +bins.value;
+    const minV = Math.min(...record);
+    const maxV = Math.max(...record);
+    const pad = 18;
+    const W = hw - pad*2;
+    const H = hh - pad*2;
+
+    let lo = minV, hi = maxV;
+    if (lo === hi){ lo -= 1; hi += 1; }
+    const bwid = (hi - lo) / binCount;
+
+    const counts = Array(binCount).fill(0);
+    for (const v of record){
+      let idx = Math.floor((v - lo)/bwid);
+      if (idx < 0) idx = 0;
+      if (idx >= binCount) idx = binCount-1;
+      counts[idx]++;
+    }
+    const maxC = Math.max(...counts);
+
+    // axes
+    hctx.strokeStyle = "rgba(255,255,255,0.16)";
+    hctx.lineWidth = 1;
+    hctx.beginPath();
+    hctx.moveTo(pad, pad);
+    hctx.lineTo(pad, pad+H);
+    hctx.lineTo(pad+W, pad+H);
+    hctx.stroke();
+
+    // bars
+    const barW = W / binCount;
+    for (let i=0;i<binCount;i++){
+      const c = counts[i];
+      const barH = (c/maxC) * (H-10);
+      const x = pad + i*barW;
+      const y = pad + H - barH;
+
+      hctx.fillStyle = "rgba(116,211,255,0.55)";
+      hctx.fillRect(x+1, y, Math.max(1, barW-2), barH);
+    }
+
+    // labels
+    hctx.fillStyle = "rgba(233,236,255,0.75)";
+    hctx.font = "12px system-ui";
+    hctx.textAlign = "left";
+    hctx.textBaseline = "top";
+    const what = recordWhat.value;
+    const title =
+      what==="score" ? "得点の分布（頻度）" :
+      what==="radius" ? "中心距離 r の分布（頻度）" :
+      what==="dx" ? "x誤差の分布（頻度）" :
+      what==="dy" ? "y誤差の分布（頻度）" : "分布（頻度）";
+    hctx.fillText(`${title}  / n=${n}`, pad, 6);
+
+    hctx.textAlign = "right";
+    hctx.fillText(`min=${fmt(minV,3)}  max=${fmt(maxV,3)}`, hw-pad, 6);
+
+    // x ticks (min / mid / max)
+    hctx.fillStyle = "rgba(233,236,255,0.6)";
+    hctx.textAlign = "center";
+    hctx.textBaseline = "top";
+    const yTick = pad+H+4;
+    hctx.fillText(fmt(lo,2), pad, yTick);
+    hctx.fillText(fmt((lo+hi)/2,2), pad+W/2, yTick);
+    hctx.fillText(fmt(hi,2), pad+W, yTick);
+  }
+
+  // ====== UI updates ======
+  function updateDistFields(){
+    const t = distType.value;
+    sigmaField.style.display = (t==="normal" || t==="t") ? "" : "none";
+    nuField.style.display = (t==="t") ? "" : "none";
+    aField.style.display = (t==="uniform") ? "" : "none";
+    bField.style.display = (t==="laplace") ? "" : "none";
+  }
+
+  function distInfoText(){
+  const type = distType.value;
+
+  if (type === "normal"){
+    const s = +sigma.value;
+    return {
+      outline: "ベル形。平均0まわりに集中し、外れ値は比較的少ない（裾が軽い）。",
+      params: `N(0, σ²),  σ=${s}px`,
+      formula:
+`dx, dy ~ N(0, σ²)
+
+確率密度：
+f(x)= (1/(√(2π)σ)) exp( -x²/(2σ²) )
+
+※ このゲームでは x方向とy方向を独立に同じ分布から生成`
+    };
+  }
+
+  if (type === "t"){
+    const s = +sigma.value;
+    const nuv = +nu.value;
+    return {
+      outline: "正規分布に似るが、裾が重い。νが小さいほど外れ値が出やすい。",
+      params: `t(ν),  ν=${nuv},  scale≈σ=${s}px`,
+      formula:
+`dx, dy ~ σ · t_ν
+
+（生成イメージ）
+t_ν = Z / √(V/ν)
+Z ~ N(0,1),  V ~ χ²(ν)
+
+※ ν→∞ で正規分布に近づく`
+    };
+  }
+
+  if (type === "uniform"){
+    const aa = +a.value;
+    return {
+      outline: "一定範囲で同じ確率。端まで均一に出る（ベル形ではない）。",
+      params: `U(-a, a),  a=${aa}px`,
+      formula:
+`dx, dy ~ U(-a, a)
+
+確率密度：
+f(x)= 1/(2a)   (|x|≤a)
+f(x)= 0        (otherwise)`
+    };
+  }
+
+  if (type === "laplace"){
+    const bb = +b.value;
+    return {
+      outline: "中心が尖っていて、正規より外れ値がやや出やすい（裾がやや重い）。",
+      params: `Laplace(0, b),  b=${bb}px`,
+      formula:
+`dx, dy ~ Laplace(0,b)
+
+確率密度：
+f(x)= (1/(2b)) exp(-|x|/b)
+
+（逆変換）
+u~U(-0.5,0.5)
+x = -b·sign(u)·ln(1-2|u|)`
+    };
+  }
+
+  if (type === "none"){
+    return {
+      outline: "ノイズなし。狙い点に必ず着弾（分布の広がりがゼロ）。",
+      params: `dx=0, dy=0`,
+      formula:
+`dx = 0
+dy = 0`
+    };
+  }
+
+  return { outline:"—", params:"—", formula:"—" };
+}
+
+function updateDistInfoUI(){
+  const info = distInfoText();
+  distOutline.textContent = info.outline;
+  distParams.textContent = info.params;
+  distFormula.textContent = info.formula;
+  setTimeout(updateDistInfoUI, 0);
+}
+
+  function updateSliders(){
+    sigmaDisp.textContent = sigma.value;
+    nuDisp.textContent = nu.value;
+    aDisp.textContent = a.value;
+    bDisp.textContent = b.value;
+    binsDisp.textContent = bins.value;
+  }
+
+  function dispAim(){
+    const r = Math.hypot(aim.x, aim.y);
+    aimDisp.textContent = `(${fmt(aim.x,1)}, ${fmt(aim.y,1)}) r=${fmt(r,1)}px`;
+  }
+
+  // ====== Throw logic ======
+  function doOneThrow(){
+    if (remain <= 0) return;
+
+    const noise = sampleNoise();
+    const hit = { x: aim.x + noise.dx, y: aim.y + noise.dy };
+    const r = Math.hypot(hit.x, hit.y);
+    const sc = scoreFromRadius(r);
+
+    marks.push({x: hit.x, y: hit.y, score: sc});
+    scores.push(sc);
+    sumScore += sc;
+
+    record.push(recordValue(sc, r, noise.dx, noise.dy));
+    setRemain(remain - 1);
+
+    lastDisp.textContent = `(${fmt(hit.x,1)}, ${fmt(hit.y,1)}) r=${fmt(r,1)}px`;
+    lastScoreDisp.textContent = fmt(sc, 2); // 小数2桁
+
+    // 追加：CSV用ログ行を保存
+    const now = new Date();
+    logRows.push({
+    idx: scores.length,
+    score: sc,
+    dx: noise.dx,
+    dy: noise.dy,
+    r: r,
+    hitx: hit.x,
+    hity: hit.y,
+    dist: distType.value,
+    params: distInfoText().params,
+    timestamp: now.toISOString()
+});
+
+    logLine(`#${scores.length}  score=${fmt(sc,2)}  dx=${fmt(noise.dx,2)}  dy=${fmt(noise.dy,2)}  r=${fmt(r,2)}`);
+
+    updateStats();
+    drawBoard();
+  }
+
+  function doAutoThrows(){
+    const n = remain;
+    for(let i=0;i<n;i++) doOneThrow();
+  }
+
+  // ====== Events ======
+  function boardToRelative(evt){
+    const rect = board.getBoundingClientRect();
+    const x = evt.clientX - rect.left;
+    const y = evt.clientY - rect.top;
+    // relative to center
+    return { rx: x - rect.width/2, ry: y - rect.height/2 };
+  }
+
+  function exportLogCSV(){
+  // Excelで文字化けしにくくするためBOM付きUTF-8
+  const BOM = "\uFEFF";
+
+  const header = [
+    "idx","timestamp","score","dx","dy","r","hitx","hity","dist","params"
+  ];
+
+  const lines = [header.join(",")];
+
+  for (const row of logRows){
+    const vals = [
+      row.idx,
+      row.timestamp,
+      row.score,
+      row.dx,
+      row.dy,
+      row.r,
+      row.hitx,
+      row.hity,
+      row.dist,
+      `"${String(row.params).replace(/"/g,'""')}"`
+    ];
+    lines.push(vals.join(","));
+  }
+
+  const csv = BOM + lines.join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  const ts = new Date().toISOString().replaceAll(":","-");
+  a.download = `darts_log_${ts}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
+}
+
+exportCsvBtn.addEventListener("click", () => {
+  exportLogCSV();
+});
+
+  board.addEventListener('click', (evt) => {
+    if (remain <= 0) return;
+
+    const {rx, ry} = boardToRelative(evt);
+
+    // set aim if enabled
+    if (allowAimUpdate){
+      aim.x = rx;
+      aim.y = ry;
+      dispAim();
+    }
+
+    if (autoMode.value === "on") doAutoThrows();
+    else doOneThrow();
+  });
+
+  toggleAimBtn.addEventListener('click', () => {
+    allowAimUpdate = !allowAimUpdate;
+    toggleAimBtn.textContent = `狙い点をクリックで更新：${allowAimUpdate ? "ON" : "OFF"}`;
+    toggleAimBtn.classList.toggle("secondary", true);
+  });
+
+  clearMarksBtn.addEventListener('click', () => {
+    marks = [];
+    drawBoard();
+  });
+
+  resetAllBtn.addEventListener('click', () => {
+    marks = [];
+    scores = [];
+    record = [];
+    sumScore = 0;
+    logEl.innerHTML = "";
+    logRows = [];
+    aim = {x:0, y:0};
+    dispAim();
+
+    setRemain(parseInt(trialN.value,10) || 1);
+    lastDisp.textContent = "—";
+    lastScoreDisp.textContent = "—";
+    updateStats();
+    drawBoard();
+  });
+
+  trialN.addEventListener('change', () => {
+    const v = Math.max(1, Math.min(5000, parseInt(trialN.value,10) || 1));
+    trialN.value = v;
+    setRemain(v);
+  });
+
+   distType.addEventListener('change', () => {
+    updateDistFields();
+    updateDistInfoUI();
+  });
+
+[sigma, nu, a, b, bins].forEach(el => {
+  el.addEventListener('input', () => {
+    updateSliders();
+    updateDistInfoUI();
+    drawHist();
+  });
+});
+
+  recordWhat.addEventListener('change', () => {
+    // 既存データの "record" はそのままにする（学習用に固定）でも良いが、
+    // ここでは切り替え時に再計算し直して分布を見やすくする
+    const newRec = [];
+    for (let i=0;i<scores.length;i++){
+      const m = marks[i];
+      const r = Math.hypot(m.x, m.y);
+      // dx,dyは記録してないので再推定できない → ここだけ注意
+      // dx/dyを選んだ場合、以降の投擲から正しいdx/dyが記録されるようにするため、
+      // 既存データはradius/scoreのみ再構成する
+      const what = recordWhat.value;
+      if (what === "score") newRec.push(scores[i]);
+      else if (what === "radius") newRec.push(r);
+      else newRec.push(NaN);
+    }
+    record = newRec.filter(Number.isFinite);
+    updateStats();
+  });
+
+  window.addEventListener('resize', () => {
+    ({w:bw, h:bh} = resizeCanvasToCSS(board));
+    ({w:hw, h:hh} = resizeCanvasToCSS(hist));
+    drawBoard();
+    drawHist();
+  });
+
+  // ====== Init ======
+  updateDistFields();
+  updateSliders();
+  updateDistInfoUI();
+
+  ({w:bw, h:bh} = resizeCanvasToCSS(board));
+  ({w:hw, h:hh} = resizeCanvasToCSS(hist));
+
+  dispAim();
+  updateStats();
+  drawBoard();
+  drawHist();
+})();
+</script>
+</body>
+</html>
