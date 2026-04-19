@@ -304,7 +304,7 @@ main{
       </div>
 
       <!-- ▼▼ 置換：統計＋計算式（右側）レイアウト ▼▼ -->
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; align-items:start; margin-top:10px;">
+<div style="display:grid; grid-template-columns: 1fr; gap:10px; align-items:start; margin-top:10px;">
   <div class="statgrid" style="margin:0;">
     <div class="stat">
       <div class="k">平均（記録値）</div>
@@ -894,6 +894,8 @@ function updateDistInfoUI(){
     setRemain(remain - 1);
 
     //lastDisp.textContent = `(${fmt(hit.x,1)}, ${fmt(hit.y,1)}) r=${fmt(r,1)}px`;
+    if (lastDisp) lastDisp.textContent = "—";
+    if (aimDisp) aimDisp.textContent = "...";
     lastScoreDisp.textContent = fmt(sc, 2); // 小数2桁
 
     // 追加：CSV用ログ行を保存
@@ -1014,7 +1016,8 @@ exportCsvBtn.addEventListener("click", () => {
     dispAim();
 
     setRemain(parseInt(trialN.value,10) || 1);
-    lastDisp.textContent = "—";
+   if (lastDisp) lastDisp.textContent = "—";
+   if (aimDisp) aimDisp.textContent = "...";
     lastScoreDisp.textContent = "—";
     updateStats();
     drawBoard();
