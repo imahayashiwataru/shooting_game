@@ -29,7 +29,7 @@
 
     main{
       display:grid;
-      grid-template-columns: 1.2fr 0.8fr;
+      grid-template-columns: 1.5fr 0.5fr;
       gap:12px;
       padding:12px;
       height: calc(100vh - 56px);
@@ -45,7 +45,7 @@ main{
   main{
     gap: 8px;
     padding: 8px;
-    grid-template-columns: 1fr 1fr; /* 左右均等に */
+    grid-template-columns: 1.5fr 0.5fr; /* 左右均等に */
     height: calc(100dvh - 48px);    /* ヘッダが薄くなる想定で少し短く */
   }
   .card .card-b{ padding: 8px; }
@@ -217,7 +217,7 @@ main{
           <input type="number" id="trialN" min="1" max="5000" step="1" value="200">
         </div>
         <div class="field">
-          <label>自動連投（クリック1回で試行回数分投げる．）</label>
+          <label>自動連投（試行回数分投げる．）</label>
           <select id="autoMode">
             <option value="off">OFF</option>
             <option value="on">ON</option>
@@ -327,18 +327,6 @@ main{
       <div class="small">投げた回数</div>
     </div>
   </div>
-
-  <!-- ▼追加：計算式カード（右側） -->
-  <div class="stat">
-    <div class="k">計算式（記録値 x₁..xₙ）</div>
-    <div class="log" style="height:auto;">
-      平均： μ = (1/n) Σ xᵢ<br>
-      分散（母分散）： σ² = (1/n) Σ (xᵢ − μ)²<br>
-      標準偏差： σ = √(σ²)
-      <hr style="border:none;border-top:1px solid var(--line); margin:10px 0;">
-      <span class="small">※「記録する値」が得点/半径/誤差(dx,dy)のどれでも同じ式です。</span>
-    </div>
-  </div>
 </div>
 <!-- ▲▲ 置換：統計＋計算式（右側）レイアウト ▲▲ -->
 
@@ -346,7 +334,7 @@ main{
 
       <div class="row" style="align-items:flex-start;">
         <div style="flex:1; min-width:260px;">
-          <div class="kv"><span class="small">ログ（得点/誤差）</span><span class="small">最新が下</span></div>
+          <div class="kv"><span class="small">ログ（得点/誤差）</span></div>
           <div class="log" id="log"></div>
         </div>
       </div>
@@ -796,7 +784,7 @@ for (let i = ringRatios.length - 1; i >= 0; i--){
   if (type === "normal"){
     const s = +sigma.value;
     return {
-      outline: "ベル形。平均0まわりに集中し、外れ値は比較的少ない（裾が軽い）。",
+      outline: "平均0まわりに集中し、\n外れ値は比較的少ない。",
       params: `N(0, σ²),  σ=${s}px`,
       formula:
 `dx, dy ~ N(0, σ²)
@@ -804,7 +792,7 @@ for (let i = ringRatios.length - 1; i >= 0; i--){
 確率密度：
 f(x)= (1/(√(2π)σ)) exp( -x²/(2σ²) )
 
-※ このゲームでは x方向とy方向を独立に同じ分布から生成`
+※x方向とy方向を独立に同じ分布から生成`
     };
   }
 
