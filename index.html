@@ -379,15 +379,17 @@ main{
 
   let bw=0, bh=0, hw=0, hh=0;
 
+  function updateBoardRadius(){
+  // 端の余白（ラベルや線幅分）
+  const margin = 24;
+  // canvasの短辺に収まる最大半径
+  boardR = Math.max(60, Math.min(bw, bh)/2 - margin);
+}
+
   // ====== Dartboard model ======
-  const rings = [
-    { r: 40, score: 10 },
-    { r: 80, score:  8 },
-    { r: 120, score: 6 },
-    { r: 160, score: 4 },
-    { r: 200, score: 2 },
-  ];
-  // outside: 0
+  const ringRatios = [0.20, 0.40, 0.60, 0.80, 1.00];  // 内→外（Rの何倍か）
+const ringLabels = [10, 8, 6, 4, 2];                // 表示用（任意）
+let boardR = 200; // 実際の外周半径（後で自動更新）
 
   let center = {x: 0, y: 0};
   let aim = {x: 0, y: 0};   // relative to center
@@ -531,7 +533,7 @@ function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
 
 // 盤半径（今は rings の最大半径）
 function boardRadius(){
-  return rings[rings.length-1].r;
+  return boardR;  // ←固定200ではなく、画面に合わせた半径
 }
 
 // 連続得点：中心10点 → 外周0点（線形）
@@ -627,38 +629,27 @@ function scoreFromRadius(r){
     bctx.fillRect(0,0,bw,bh);
 
     center = {x: bw/2, y: bh/2};
-    const R = rings[rings.length-1].r;
+const R = boardR;
 
-    // subtle grid
-    bctx.save();
-    bctx.strokeStyle = "rgba(255,255,255,0.06)";
-    bctx.lineWidth = 1;
-    for(let x=0;x<bw;x+=40){
-      bctx.beginPath(); bctx.moveTo(x,0); bctx.lineTo(x,bh); bctx.stroke();
-    }
-    for(let y=0;y<bh;y+=40){
-      bctx.beginPath(); bctx.moveTo(0,y); bctx.lineTo(bw,y); bctx.stroke();
-    }
-    bctx.restore();
+// rings（比率で描く）
+for (let i = ringRatios.length - 1; i >= 0; i--){
+  const rr = R * ringRatios[i];
 
-    // rings
-    for (let i=rings.length-1;i>=0;i--){
-      const rr = rings[i].r;
-      bctx.beginPath();
-      bctx.arc(center.x, center.y, rr, 0, Math.PI*2);
-      bctx.fillStyle = (i%2===0) ? "rgba(116,211,255,0.10)" : "rgba(255,255,255,0.06)";
-      bctx.fill();
-      bctx.lineWidth = 2;
-      bctx.strokeStyle = "rgba(255,255,255,0.16)";
-      bctx.stroke();
+  bctx.beginPath();
+  bctx.arc(center.x, center.y, rr, 0, Math.PI*2);
+  bctx.fillStyle = (i%2===0) ? "rgba(116,211,255,0.10)" : "rgba(255,255,255,0.06)";
+  bctx.fill();
+  bctx.lineWidth = 2;
+  bctx.strokeStyle = "rgba(255,255,255,0.16)";
+  bctx.stroke();
 
-      // label score
-      bctx.fillStyle = "rgba(233,236,255,0.85)";
-      bctx.font = "12px system-ui";
-      bctx.textAlign = "left";
-      bctx.textBaseline = "middle";
-      bctx.fillText(`${rings[i].score}点`, center.x + rr + 8, center.y);
-    }
+  // ラベル（任意：連続得点にしているので消してもOK）
+  bctx.fillStyle = "rgba(233,236,255,0.85)";
+  bctx.font = "12px system-ui";
+  bctx.textAlign = "left";
+  bctx.textBaseline = "middle";
+  bctx.fillText(`${ringLabels[i]}点`, center.x + rr + 8, center.y);
+}
 
     // bull
     bctx.beginPath();
@@ -1079,20 +1070,24 @@ exportCsvBtn.addEventListener("click", () => {
     updateStats();
   });
 
-  window.addEventListener('resize', () => {
-    ({w:bw, h:bh} = resizeCanvasToCSS(board));
-    ({w:hw, h:hh} = resizeCanvasToCSS(hist));
-    drawBoard();
-    drawHist();
-  });
+  // resize側：bw,bh更新直後
+window.addEventListener('resize', () => {
+  ({w:bw, h:bh} = resizeCanvasToCSS(board));
+  ({w:hw, h:hh} = resizeCanvasToCSS(hist));
+  updateBoardRadius();
+  drawBoard();
+  drawHist();
+});
 
   // ====== Init ======
   updateDistFields();
   updateSliders();
   updateDistInfoUI();
 
-  ({w:bw, h:bh} = resizeCanvasToCSS(board));
-  ({w:hw, h:hh} = resizeCanvasToCSS(hist));
+// init側：canvasサイズ取得直後
+({w:bw, h:bh} = resizeCanvasToCSS(board));
+({w:hw, h:hh} = resizeCanvasToCSS(hist));
+updateBoardRadius();
 
   dispAim();
   updateStats();
