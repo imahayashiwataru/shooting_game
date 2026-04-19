@@ -180,13 +180,13 @@ main{
     <div class="card-h">
       <div class="row">
         <b>ゲーム画面</b>
-        <span class="pill">ターゲット：<span id="aimDisp">中心</span></span>
-        <span class="pill">着弾点：<span id="lastDisp">—</span></span>
-        <span class="pill">取得点数：<span id="lastScoreDisp">—</span></span>
+        <span class="pill">狙い点：<span id="aimDisp">中心</span></span>
+        <span class="pill">着弾：<span id="lastDisp">—</span></span>
+        <span class="pill">点数：<span id="lastScoreDisp">—</span></span>
       </div>
       <div class="row">
-        <button class="btn secondary" id="toggleAimBtn">ターゲットを固定：ON</button>
-        <button class="btn secondary" id="clearMarksBtn">着弾点を消す</button>
+        <button class="btn secondary" id="toggleAimBtn">固定：ON</button>
+        <button class="btn secondary" id="clearMarksBtn">着弾点</button>
       </div>
     </div>
     <div class="card-b">
@@ -994,7 +994,7 @@ exportCsvBtn.addEventListener("click", () => {
 
   toggleAimBtn.addEventListener('click', () => {
     allowAimUpdate = !allowAimUpdate;
-    toggleAimBtn.textContent = `狙い点をクリックで更新：${allowAimUpdate ? "ON" : "OFF"}`;
+    toggleAimBtn.textContent = `固定：${allowAimUpdate ? "ON" : "OFF"}`;
     toggleAimBtn.classList.toggle("secondary", true);
   });
 
